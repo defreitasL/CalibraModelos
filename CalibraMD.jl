@@ -16,6 +16,7 @@ using Dates
 using MAT
 using JLD2
 using FileIO
+using SciPy
 
 
 # # # # # # # # # # # # # # # # # # # # # # # 
@@ -25,7 +26,6 @@ wkDIR=pwd()
 data_path = "C:\\Users\\freitasl\\Documents\\MATLAB\\CoastalSediments2023\\data"
 
 include(wkDIR*"\\Modulos\\Biblioteca.jl")
-include(wkDIR*"\\Modulos\\CaLIB.jl") # Calibration Library
 
 data = readdlm(data_path*"\\1_PROPAGACION_ROTURA_Jara15.4_rotura06_datevec_angulo_Hcr.dat", ' ', Any, '\n'; skipblanks=true)
 idx = data .!= ""
@@ -67,6 +67,13 @@ Y_obs = Y0["S3_4"]
 Y_obs_nt = Y0["NEW_S3_4"]
 
 
+
+JA15 = matread(data_path*"\\JA15_results.mat")
+JA15 = JA15["JA15"]
+t_JA = range(rata2datetime(JA15["timer_"][1]),rata2datetime(JA15["timer_"][end-23]),step = Hour(1))
+Y_JA = JA15["xr_"][1:length(t_JA)]
+
+
 # # # # # # # # # # # # # # # # # # # # # # # # 
 # # # # # # # # # Preproceso # # # # # # # # # 
 # # # # # # # # # # # # # # # # # # # # # # # 
@@ -103,9 +110,10 @@ end
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
+flaP = 4
 
 function Calibra_MD(Χ)
-    Ymd, _ = HM.MILLER_DEAN_CSonly(hb,hb./.78,sl,Χ[1],dt,D50,Hberm, Χ[2], Χ[3], Χ[4])
+    Ymd, _ = HM.MILLER_DEAN_CSonly(hb,hb./.78,sl,Χ[1],dt,D50,Hberm, Χ[2], Χ[3], Χ[4], flagP, Omega)
     YYsl = Ymd[Int.(idx_obs)]
     return sum((YYsl .- Y_obs).^2)/length(YYsl)/(var(YYsl)+var(Y_obs)+(mean(YYsl)-mean(Y_obs))^2)
 end
@@ -119,3 +127,11 @@ npop = 50
 npar = length(P0)
 
 calibr = CAL.sce_ua2(Calibra_MD, P0, ngen, npop, npar, mag)
+println("k = k .* Omega")
+println("----------------------------------")
+println("Y0 = "*string(calibr[1])*" m")
+println("kero = "*string(calibr[2]))
+println("kacr = "*string(calibr[3]))
+println("YiMD = "*string(calibr[4])*" m")
+println("flagP = "*string(flagP))
+

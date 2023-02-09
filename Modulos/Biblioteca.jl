@@ -1482,7 +1482,7 @@ function Y09_MOD(hs,HSB,DY,DT)
 
 end
 
-function ShoreFor(OmegaEQ,tp,hb,depthb,D50,Omega,dt,phi = 0, c = 0, D = 0, Dr = 0, Sini = 0)
+function ShoreFor(OmegaEQ,tp,hb,depthb,D50,Omega,dt,phi = 0, c = 0, D = 0, Dr = 0, Sini = 0, k = 0.5)
     rho = 1025.
     g = 9.81
     if length(size(hb)) != 1
@@ -1569,7 +1569,7 @@ function ShoreFor(OmegaEQ,tp,hb,depthb,D50,Omega,dt,phi = 0, c = 0, D = 0, Dr = 
         # OmegaEQ = OmegaEQ[IDX:end] .+ mean(Omega)
         # F = P[IDX:end].^.5 .* (OmegaEQ .- Omega[IDX:end])./dpO
         OmegaEQ = OmegaEQ .+ mean(Omega)
-        F = P.^.5 .* (OmegaEQ .- Omega)./std(OmegaEQ)
+        F = P.^k .* (OmegaEQ .- Omega)./std(OmegaEQ)
         S = zeros(length(Omega))
         # S = zeros(length(Omega)-IDX)
         
@@ -1628,8 +1628,21 @@ function ShoreFor(OmegaEQ,tp,hb,depthb,D50,Omega,dt,phi = 0, c = 0, D = 0, Dr = 
     
 end
 
-function MILLER_DEAN_CSonly(hb,depthb,sl,Y0,dt,D50,Hberm, kero, kacr, Yi)
-        
+function MILLER_DEAN_CSonly(hb,depthb,sl,Y0,dt,D50,Hberm, kero, kacr, Yi, flagP = 1, Omega = 0)
+
+    if flagP == 1
+        kero = repeat(kero, length(hb))
+        kacr = repeat(kacr, length(hb))
+    elseif flagP == 2
+        kero = kero .* hb .^2
+        kacr = kacr .* hb .^2
+    elseif flagP == 3
+        kero = kero .* hb .^3
+        kacr = kacr .* hb .^3
+    elseif flagP == 4
+        kero = kero .* Omega
+        kacr = kacr .* Omega
+    end
     yeq = zeros(size(hb))
     Y = zeros(size(hb))
 
@@ -1639,12 +1652,12 @@ function MILLER_DEAN_CSonly(hb,depthb,sl,Y0,dt,D50,Hberm, kero, kacr, Yi)
         yeq[i] = Y0 .- Wast.*(wl)./(Hberm.+depthb[i])
         if i ==1
             r = yeq[i].-Y[i] > 0
-            k = kacr * r + kero * !r
+            k = kacr[i] * r + kero[i] * !r
             # k = k .* hb[i]^2
             Y[i] = Yi
         else
             r = yeq[i].-Y[i-1] > 0
-            k = kacr * r + kero * !r
+            k = kacr[i] * r + kero[i] * !r
             # k = k .* hb[i]^2
             Y[i] = dt * k * (yeq[i] - Y[i-1]) + Y[i-1]
         end

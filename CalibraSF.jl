@@ -26,7 +26,6 @@ wkDIR=pwd()
 data_path = "C:\\Users\\freitasl\\Documents\\MATLAB\\CoastalSediments2023\\data"
 
 include(wkDIR*"\\Modulos\\Biblioteca.jl")
-include(wkDIR*"\\Modulos\\CaLIB.jl") # Calibration Library
 
 data = readdlm(data_path*"\\1_PROPAGACION_ROTURA_Jara15.4_rotura06_datevec_angulo_Hcr.dat", ' ', Any, '\n'; skipblanks=true)
 idx = data .!= ""
@@ -67,6 +66,12 @@ t_obs = rata2datetime.(Y0["time"])
 Y_obs = Y0["S3_4"]
 Y_obs_nt = Y0["NEW_S3_4"]
 
+
+
+JA15 = matread(data_path*"\\JA15_results.mat")
+JA15 = JA15["JA15"]
+t_JA = range(rata2datetime(JA15["timer_"][1]),rata2datetime(JA15["timer_"][end-23]),step = Hour(1))
+Y_JA = JA15["xr_"][1:length(t_JA)]
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -110,14 +115,22 @@ end
 
 
 function Calibra_SF(P)
-    Y, _, _, _, _, _ = HM.ShoreFor(0,tp,hb,hb./.78,D50,Omega,dt,P[1], P[2], P[3], P[4], P[5])
+    Y, _, _, _, _, _ = HM.ShoreFor(0,tp,hb,hb./.78,D50,Omega,dt,P[1], P[2], P[3], P[4], P[5], P[6])
     YYsl = Y[Int.(idx_obs)]
     return sum((YYsl .- Y_obs).^2)/length(YYsl)/(var(YYsl)+var(Y_obs)+(mean(YYsl)-mean(Y_obs))^2)
 end
-mag = [15, 1e-3, 15, 15, 4]
-P0 = [157.28; 1.61e-4; 228.96; 317.71; -0.09467]
+
+mag = [15, 1e-3, 15, 15, 4, 0.2]
+P0 = [174.57; 0.00016888956571802364; 214.558; 323.255863; -1.67025550; 0.5]
 ngen = 1000
 npop = 50
 npar = length(P0)
 
-calibr = HM.sce_ua2(Calibra_SF, P0, ngen, npop, npar, mag)
+calibr = CAL.sce_ua2(Calibra_SF, P0, ngen, npop, npar, mag)
+
+println("phi = "*string(calibr[1])*" days")
+println("c = "*string(calibr[2]))
+println("D = "*string(calibr[3])*" days")
+println("Dr = "*string(calibr[4])*" days")
+println("YiSF = "*string(calibr[5])*" m")
+println("k = "*string(calibr[6]))

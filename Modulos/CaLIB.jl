@@ -122,10 +122,10 @@ function sce_ua2(f, x0, ngen, npop, npar, mag)
             
             if y1 < y2
                 # Use x1 as the better individual
-                pop[i+1,:] = x1 .+ 0.5 .* (x2 .- x1) .+ 0.5 .* mag .* randn(npar)
+                pop[i+1,:] = x1 .+ 0.5 .* (x2 .- x1) .+ abs.(0.5 .* mag .* randn(npar))
             else
                 # Use x2 as the better individual
-                pop[i,:] = x2 .+ 0.5 .* (x1 .- x2) .+ 0.5 .* mag .* randn(npar)
+                pop[i,:] = x2 .+ 0.5 .* (x1 .- x2) .+ abs.(0.5 .* mag .* randn(npar))
             end
         end
         println("Generation = " * string(gen/ngen*100) * " %")
@@ -134,5 +134,6 @@ function sce_ua2(f, x0, ngen, npop, npar, mag)
     # Return the best solution
     return pop[argmin(fvals)[1],:]
 end
+
 
 end # module
