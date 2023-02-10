@@ -37,7 +37,9 @@ end
 
 YY, MM, DD, HH = brk_par[:,1], brk_par[:,2], brk_par[:,3], brk_par[:,4]
 
-hb, tp, thetb =  brk_par[:,10], brk_par[:,8], brk_par[:,12]
+hb, tp, thetb, hs =  brk_par[:,10], brk_par[:,8], brk_par[:,12], brk_par[:,7]
+
+hb = hs
 
 hb[hb .< 0.05] .= 0.05
 
@@ -112,25 +114,89 @@ end
 # # # # # # # # # # # # # Calculo # # # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+# Metrica a utilizar para calibrar:
+MetObj = "MSS" # [Pearson, RMSE, MSS, BSS]
 
 
 function Calibra_SF(P)
-    Y, _, _, _, _, _ = HM.ShoreFor(0,tp,hb,hb./.78,D50,Omega,dt,P[1], P[2], P[3], P[4], P[5], P[6])
+    Y, _, _, _, _, _ = HM.ShoreFor(0,tp,hb,hb./.78,D50,Omega,dt,exp(P[1]), exp(P[2]), exp(P[3]), exp(P[4]), P[5], exp(P[6]))
     YYsl = Y[Int.(idx_obs)]
-    return sum((YYsl .- Y_obs).^2)/length(YYsl)/(var(YYsl)+var(Y_obs)+(mean(YYsl)-mean(Y_obs))^2)
+    if MetObj == "Pearson"
+        return sum((YYsl.-mean(YYsl)).*(Y_obs_nt .- mean(Y_obs_nt)))/(std(YYsl)*std(Y_obs_nt)*length(YYsl))
+    elseif MetObj == "RMSE"
+        return abs(sqrt(mean((YYsl .- Y_obs_nt).^2)))
+    elseif MetObj == "MSS"
+        return sum((YYsl .- Y_obs_nt).^2)/length(YYsl)/(var(YYsl)+var(Y_obs_nt)+(mean(YYsl)-mean(Y_obs_nt))^2)
+    elseif MetObj == "BSS"
+        return mean((YYsl .- Y_obs_nt .- Yerr).^2)/(Yerr).^2
+    end
 end
 
-mag = [15, 1e-3, 15, 15, 4, 0.2]
-P0 = [174.57; 0.00016888956571802364; 214.558; 323.255863; -1.67025550; 0.5]
-ngen = 1000
-npop = 50
+# mag = [log(5), log(1e-4), log(5), log(5), 5, log(0.2)]
+# P0 = [phi; c; D; Dr; YiSF; k]
+P0 = [log( 383.780224224017); log(0.0011309455626905363); log(108.99910994337266); log(297.6233194291766); 49.59738193354021; log(0.15894252362638073)]
+mag = [P0[1] .* 1e-1; P0[2] .* 1e-1; P0[3] .* 1e-1; P0[4] .* 1e-1; 4 ; P0[6] .* 1e-1;]
+ngen = 10000
+npop = 20
 npar = length(P0)
 
-calibr = CAL.sce_ua2(Calibra_SF, P0, ngen, npop, npar, mag)
+calibr, MetVal = HM.sce_ua2(Calibra_SF, P0, ngen, npop, npar, mag)
 
-println("phi = "*string(calibr[1])*" days")
-println("c = "*string(calibr[2]))
-println("D = "*string(calibr[3])*" days")
-println("Dr = "*string(calibr[4])*" days")
+MetVal = 1 - MetVal
+
+println("phi = "*string(exp(calibr[1]))*" days")
+println("c = "*string(exp(calibr[2])))
+println("D = "*string(exp(calibr[3]))*" days")
+println("Dr = "*string(exp(calibr[4]))*" days")
 println("YiSF = "*string(calibr[5])*" m")
-println("k = "*string(calibr[6]))
+println("k = "*string(exp(calibr[6])))
+println("$MetObj =  $MetVal")
+
+
+Y, _, _, _, _, iidd = HM.ShoreFor(0,tp,hb,hb./.78,D50,Omega,dt,exp(calibr[1]), 
+                        exp(calibr[2]), exp(calibr[3]), exp(calibr[4]), calibr[5], exp(calibr[6]))
+
+
+scatter(
+    t_obs,
+    Y_obs_nt,
+    label="Datos", 
+    tickfont = (10,"Computer Modern"),
+    fontfamily = "Computer Modern",
+    ylabel = "Shoreline Position (m)",
+    labelfontsize = 12,
+    left_margin = 20Plots.mm,
+    right_margin = 8Plots.mm,
+    bottom_margin = 5Plots.mm,
+    size = [2000, 400],
+    markershape = :circle,
+    markeralpha = 0.8,
+    markercolor = :gray,
+    markerstrokewidth = 1,
+    markerstrokealpha = 1,
+    markerstrokecolor = :black,
+    legend=:topleft,
+    xlim = (DateTime(2004),DateTime(2020)),
+    # ylim = (15, 80),
+    title="Calibration of ShoreFor model using SCE-UA algorithm",
+    titlefont=font(12, "bold")
+)
+plot!(
+    fechas[iidd:end],
+    Y,
+    label="ShoreFor",
+    lc=:red,
+    lw=1,
+)
+plot!(twinx(),
+    fechas,
+    hb.^2 ./maximum(hb.^2.),
+    lc = :magenta,
+    lw = 0.8,
+    label = "Wave Energy",
+    legend=:topright,
+    ylim = (0, 4),
+    xticks = ([0:0.25:1], [0:0.25:1]))
+plot!(xticks = (ticks, Dates.format.(ticks, "yyyy")))
+
+savefig("SF_Calibration.png")
